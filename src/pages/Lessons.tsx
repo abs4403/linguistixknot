@@ -6,9 +6,12 @@ import { cefrLevels } from "@/lib/mock-data";
 import { languagePacks } from "@/lib/language-content";
 import { CheckCircle2, Lock, PlayCircle, Search, Volume2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { speak } from "@/lib/speech";
+import { useAuth } from "@/contexts/AuthContext";
+import { getProfile, updateLanguage } from "@/lib/progress";
+import { supabase } from "@/integrations/supabase/client";
 
 const moduleColors: Record<string, string> = {
   Vocabulary: "bg-mint/20 text-teal",
@@ -19,12 +22,26 @@ const moduleColors: Record<string, string> = {
 };
 
 const Lessons = () => {
+  const { user } = useAuth();
   const [lang, setLang] = useState("es");
   const [level, setLevel] = useState<string>("all");
   const [q, setQ] = useState("");
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+
+  // Load saved current_language + completions
+  useEffect(() => {
+    if (!user) return;
+    getProfile(user.id).then(p => { if (p?.current_language) setLang(p.current_language); });
+    supabase.from("lesson_completions").select("lesson_id").eq("user_id", user.id)
+      .then(({ data }) => { if (data) setCompletedIds(new Set(data.map(d => d.lesson_id))); });
+  }, [user]);
+
+  const handleLangChange = (code: string) => {
+    setLang(code);
+    if (user) updateLanguage(user.id, code);
+  };
 
   const pack = languagePacks[lang];
-
   const filtered = useMemo(
     () => pack.lessons.filter(l =>
       (level === "all" || l.level === level) &&
@@ -43,12 +60,11 @@ const Lessons = () => {
           </p>
         </div>
 
-        {/* Languages */}
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
           {Object.values(languagePacks).map(l => (
             <button
               key={l.code}
-              onClick={() => setLang(l.code)}
+              onClick={() => handleLangChange(l.code)}
               className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full border transition-smooth ${
                 lang === l.code
                   ? "bg-navy text-white border-navy shadow-card"
@@ -61,7 +77,6 @@ const Lessons = () => {
           ))}
         </div>
 
-        {/* Levels + search */}
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
           <div className="flex flex-wrap gap-2">
             <button
@@ -92,10 +107,10 @@ const Lessons = () => {
           </Card>
         )}
 
-        {/* Lesson list */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((l) => {
             const locked = l.level === "C1" || l.level === "C2";
+            const done = completedIds.has(l.id);
             return (
               <Card key={l.id} className={`p-5 transition-smooth ${locked ? "opacity-60" : "hover:shadow-card hover:-translate-y-1"}`}>
                 <div className="flex items-center justify-between mb-3">
@@ -108,17 +123,20 @@ const Lessons = () => {
                   <button
                     onClick={() => speak(l.cards[0].front, pack.locale)}
                     className="text-xs flex items-center gap-1 text-teal hover:text-navy"
-                    aria-label="Preview pronunciation"
                   >
                     <Volume2 className="w-3.5 h-3.5" />
                     Preview "{l.cards[0].front}"
                   </button>
                 </div>
-                <Progress value={0} className="h-1.5 mb-4" />
+                <Progress value={done ? 100 : 0} className="h-1.5 mb-4" />
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">+{l.xp} XP · {l.duration} min</div>
                   {locked ? (
                     <Button variant="ghost" size="sm" disabled><Lock className="w-4 h-4" /></Button>
+                  ) : done ? (
+                    <Button variant="ghost" size="sm" className="text-teal" asChild>
+                      <Link to={`/lesson/${l.id}`}><CheckCircle2 className="w-4 h-4" /> Review</Link>
+                    </Button>
                   ) : (
                     <Button variant="mint" size="sm" asChild>
                       <Link to={`/lesson/${l.id}`}><PlayCircle className="w-4 h-4" /> Start</Link>
