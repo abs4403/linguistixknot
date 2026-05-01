@@ -2,11 +2,13 @@ import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { languages, cefrLevels, lessons } from "@/lib/mock-data";
-import { CheckCircle2, Lock, PlayCircle, Search } from "lucide-react";
+import { cefrLevels } from "@/lib/mock-data";
+import { languagePacks } from "@/lib/language-content";
+import { CheckCircle2, Lock, PlayCircle, Search, Volume2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { speak } from "@/lib/speech";
 
 const moduleColors: Record<string, string> = {
   Vocabulary: "bg-mint/20 text-teal",
@@ -21,9 +23,14 @@ const Lessons = () => {
   const [level, setLevel] = useState<string>("all");
   const [q, setQ] = useState("");
 
-  const filtered = lessons.filter(l =>
-    (level === "all" || l.level === level) &&
-    l.title.toLowerCase().includes(q.toLowerCase())
+  const pack = languagePacks[lang];
+
+  const filtered = useMemo(
+    () => pack.lessons.filter(l =>
+      (level === "all" || l.level === level) &&
+      l.title.toLowerCase().includes(q.toLowerCase())
+    ),
+    [pack, level, q],
   );
 
   return (
@@ -31,12 +38,14 @@ const Lessons = () => {
       <div className="container py-8 space-y-8">
         <div>
           <h1 className="font-display text-3xl font-bold text-navy">Lessons</h1>
-          <p className="text-muted-foreground">Pick a language and dive in.</p>
+          <p className="text-muted-foreground">
+            Pick a language and dive in — every word can be spoken aloud.
+          </p>
         </div>
 
         {/* Languages */}
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
-          {languages.map(l => (
+          {Object.values(languagePacks).map(l => (
             <button
               key={l.code}
               onClick={() => setLang(l.code)}
@@ -77,9 +86,15 @@ const Lessons = () => {
           </div>
         </div>
 
+        {filtered.length === 0 && (
+          <Card className="p-10 text-center text-muted-foreground">
+            No lessons match these filters yet — try another level.
+          </Card>
+        )}
+
         {/* Lesson list */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((l, i) => {
+          {filtered.map((l) => {
             const locked = l.level === "C1" || l.level === "C2";
             return (
               <Card key={l.id} className={`p-5 transition-smooth ${locked ? "opacity-60" : "hover:shadow-card hover:-translate-y-1"}`}>
@@ -87,16 +102,23 @@ const Lessons = () => {
                   <span className={`text-xs px-2 py-1 rounded-md font-medium ${moduleColors[l.module]}`}>{l.module}</span>
                   <span className="text-xs px-2 py-1 rounded-md bg-accent text-navy font-semibold">{l.level}</span>
                 </div>
-                <h3 className="font-display font-bold text-navy text-lg mb-2">{l.title}</h3>
-                <Progress value={l.progress ?? 0} className="h-1.5 mb-4" />
+                <h3 className="font-display font-bold text-navy text-lg mb-1">{l.title}</h3>
+                <p className="text-xs text-muted-foreground mb-3">{l.cards.length} vocabulary cards</p>
+                <div className="flex items-center gap-2 mb-4">
+                  <button
+                    onClick={() => speak(l.cards[0].front, pack.locale)}
+                    className="text-xs flex items-center gap-1 text-teal hover:text-navy"
+                    aria-label="Preview pronunciation"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    Preview "{l.cards[0].front}"
+                  </button>
+                </div>
+                <Progress value={0} className="h-1.5 mb-4" />
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">+{l.xp} XP · {l.duration} min</div>
                   {locked ? (
                     <Button variant="ghost" size="sm" disabled><Lock className="w-4 h-4" /></Button>
-                  ) : l.completed ? (
-                    <Button variant="ghost" size="sm" className="text-teal" asChild>
-                      <Link to={`/lesson/${l.id}`}><CheckCircle2 className="w-4 h-4" /> Review</Link>
-                    </Button>
                   ) : (
                     <Button variant="mint" size="sm" asChild>
                       <Link to={`/lesson/${l.id}`}><PlayCircle className="w-4 h-4" /> Start</Link>
