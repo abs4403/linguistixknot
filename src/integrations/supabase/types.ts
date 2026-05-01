@@ -14,7 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      lesson_completions: {
+        Row: {
+          completed_at: string
+          id: string
+          language_code: string
+          lesson_id: string
+          level: string
+          module: string
+          score: number
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          language_code: string
+          lesson_id: string
+          level: string
+          module: string
+          score?: number
+          user_id: string
+          xp_earned?: number
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          language_code?: string
+          lesson_id?: string
+          level?: string
+          module?: string
+          score?: number
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_initials: string
+          created_at: string
+          current_language: string
+          display_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_initials?: string
+          created_at?: string
+          current_language?: string
+          display_name?: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_initials?: string
+          created_at?: string
+          current_language?: string
+          display_name?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_progress: {
+        Row: {
+          created_at: string
+          gems: number
+          last_activity_date: string | null
+          level: number
+          streak_days: number
+          updated_at: string
+          user_id: string
+          week_start: string
+          weekly_xp: number
+          xp: number
+        }
+        Insert: {
+          created_at?: string
+          gems?: number
+          last_activity_date?: string | null
+          level?: number
+          streak_days?: number
+          updated_at?: string
+          user_id: string
+          week_start?: string
+          weekly_xp?: number
+          xp?: number
+        }
+        Update: {
+          created_at?: string
+          gems?: number
+          last_activity_date?: string | null
+          level?: number
+          streak_days?: number
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+          weekly_xp?: number
+          xp?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
