@@ -1,48 +1,92 @@
 import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { user, lessons, skillBreakdown, weeklyProgress, achievements } from "@/lib/mock-data";
-import { Flame, Gem, Zap, Target, ArrowRight, Trophy } from "lucide-react";
+import { Progress as ProgressBar } from "@/components/ui/progress";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getProfile, getProgress, getRecentCompletions, getWeeklyXpByDay,
+  xpForLevel, type Profile, type Progress,
+} from "@/lib/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { languagePacks } from "@/lib/language-content";
+import { skillBreakdown, achievements } from "@/lib/mock-data";
+import { ArrowRight, Flame, Gem, Loader2, Target, Trophy, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar,
   BarChart, Bar, XAxis, Tooltip, CartesianGrid,
 } from "recharts";
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [weekly, setWeekly] = useState<{ day: string; xp: number }[]>([]);
+  const [recent, setRecent] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    if (!user) return;
+    const [p, pr, wk, rc] = await Promise.all([
+      getProfile(user.id), getProgress(user.id),
+      getWeeklyXpByDay(user.id), getRecentCompletions(user.id, 4),
+    ]);
+    setProfile(p); setProgress(pr); setWeekly(wk); setRecent(rc);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    refresh();
+    if (!user) return;
+    const channel = supabase.channel(`dash-${user.id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "user_progress", filter: `user_id=eq.${user.id}` },
+        () => refresh())
+      .on("postgres_changes",
+        { event: "INSERT", schema: "public", table: "lesson_completions", filter: `user_id=eq.${user.id}` },
+        () => refresh())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  if (loading || !profile || !progress) {
+    return <Layout><div className="container py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal" /></div></Layout>;
+  }
+
+  const pack = languagePacks[profile.current_language] ?? languagePacks.es;
+  const xpNeeded = xpForLevel(progress.level);
   const dailyGoal = 50;
-  const todayXp = 30;
-  const continueLessons = lessons.filter(l => !l.completed).slice(0, 3);
+  const todayXp = weekly[(new Date().getDay() + 6) % 7]?.xp ?? 0;
+  const earnedAchievements = Math.min(achievements.length,
+    [progress.streak_days >= 7, progress.xp >= 100, progress.xp >= 500, recent.length >= 5].filter(Boolean).length);
 
   return (
     <Layout>
       <div className="container py-8 space-y-8">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <p className="text-muted-foreground">Welcome back,</p>
-            <h1 className="font-display text-3xl font-bold text-navy">{user.name} 👋</h1>
+            <h1 className="font-display text-3xl font-bold text-navy">{profile.display_name} 👋</h1>
           </div>
           <Card className="px-5 py-3 flex items-center gap-4 bg-gradient-card">
-            <div className="text-3xl">{user.flag}</div>
+            <div className="text-3xl">{pack.flag}</div>
             <div>
               <div className="text-xs text-muted-foreground">Currently learning</div>
-              <div className="font-display font-semibold text-navy">{user.language} · {user.cefr}</div>
+              <div className="font-display font-semibold text-navy">{pack.name}</div>
             </div>
           </Card>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={Flame} label="Day streak" value={user.streak} color="orange" suffix="🔥" />
-          <StatCard icon={Zap} label="Total XP" value={user.xp.toLocaleString()} color="gold" />
-          <StatCard icon={Gem} label="Gems" value={user.gems} color="mint" />
-          <StatCard icon={Trophy} label="Level" value={user.level} color="teal" />
+          <StatCard icon={Flame} label="Day streak" value={progress.streak_days} color="orange" suffix="🔥" />
+          <StatCard icon={Zap} label="Total XP" value={progress.xp.toLocaleString()} color="gold" />
+          <StatCard icon={Gem} label="Gems" value={progress.gems} color="mint" />
+          <StatCard icon={Trophy} label="Level" value={progress.level} color="teal" />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Daily goal */}
           <Card className="p-6 lg:col-span-2 bg-gradient-card">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -58,17 +102,16 @@ const Dashboard = () => {
                 <Link to="/lessons">Continue <ArrowRight /></Link>
               </Button>
             </div>
-            <Progress value={(todayXp / dailyGoal) * 100} className="h-3" />
+            <ProgressBar value={Math.min(100, (todayXp / dailyGoal) * 100)} className="h-3" />
             <div className="mt-6">
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Level {user.level}</span>
-                <span className="font-medium text-navy">{user.xp} / {user.xpToNext} XP</span>
+                <span className="text-muted-foreground">Level {progress.level}</span>
+                <span className="font-medium text-navy">XP this level: {progress.xp % xpNeeded} / {xpNeeded}</span>
               </div>
-              <Progress value={(user.xp / user.xpToNext) * 100} className="h-2" />
+              <ProgressBar value={((progress.xp % xpNeeded) / xpNeeded) * 100} className="h-2" />
             </div>
           </Card>
 
-          {/* Skill breakdown */}
           <Card className="p-6">
             <h3 className="font-display font-bold text-navy mb-4">Skill breakdown</h3>
             <ResponsiveContainer width="100%" height={220}>
@@ -82,11 +125,10 @@ const Dashboard = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Weekly */}
           <Card className="p-6 lg:col-span-2">
             <h3 className="font-display font-bold text-navy mb-4">This week</h3>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={weeklyProgress}>
+              <BarChart data={weekly}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="day" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                 <Tooltip cursor={{ fill: "hsl(var(--accent))" }} contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))" }} />
@@ -95,47 +137,53 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </Card>
 
-          {/* Achievements */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display font-bold text-navy">Achievements</h3>
-              <span className="text-xs text-muted-foreground">3 / 6</span>
+              <span className="text-xs text-muted-foreground">{earnedAchievements} / {achievements.length}</span>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              {achievements.map((a) => (
-                <div key={a.id} className={`aspect-square rounded-2xl flex flex-col items-center justify-center p-2 text-center ${
-                  a.earned ? "bg-gradient-brand text-white shadow-mint" : "bg-muted text-muted-foreground opacity-60"
-                }`}>
-                  <div className="text-2xl mb-1">{a.icon}</div>
-                  <div className="text-[10px] font-medium leading-tight">{a.name}</div>
-                </div>
-              ))}
+              {achievements.map((a, i) => {
+                const earned = i < earnedAchievements;
+                return (
+                  <div key={a.id} className={`aspect-square rounded-2xl flex flex-col items-center justify-center p-2 text-center ${
+                    earned ? "bg-gradient-brand text-white shadow-mint" : "bg-muted text-muted-foreground opacity-60"
+                  }`}>
+                    <div className="text-2xl mb-1">{a.icon}</div>
+                    <div className="text-[10px] font-medium leading-tight">{a.name}</div>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </div>
 
-        {/* Continue learning */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl font-bold text-navy">Continue learning</h2>
-            <Link to="/lessons" className="text-sm text-teal font-medium hover:underline">View all</Link>
+            <h2 className="font-display text-xl font-bold text-navy">Recent activity</h2>
+            <Link to="/lessons" className="text-sm text-teal font-medium hover:underline">Browse lessons</Link>
           </div>
-          <div className="grid md:grid-cols-3 gap-4">
-            {continueLessons.map((l) => (
-              <Card key={l.id} className="p-5 hover:shadow-card transition-smooth">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs px-2 py-1 rounded-md bg-accent text-navy font-medium">{l.module}</span>
-                  <span className="text-xs px-2 py-1 rounded-md bg-mint/20 text-teal font-semibold">{l.level}</span>
-                </div>
-                <h4 className="font-display font-semibold text-navy mb-2">{l.title}</h4>
-                <Progress value={l.progress ?? 0} className="h-1.5 mb-3" />
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>+{l.xp} XP · {l.duration} min</span>
-                  <Link to={`/lesson/${l.id}`} className="text-teal font-medium">Resume →</Link>
-                </div>
-              </Card>
-            ))}
-          </div>
+          {recent.length === 0 ? (
+            <Card className="p-10 text-center">
+              <p className="text-muted-foreground mb-4">No lessons completed yet — start your first one!</p>
+              <Button variant="mint" asChild>
+                <Link to="/lessons">Start learning <ArrowRight /></Link>
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {recent.map((r) => (
+                <Card key={r.id} className="p-4">
+                  <div className="text-xs text-muted-foreground mb-1">{new Date(r.completed_at).toLocaleDateString()}</div>
+                  <div className="font-display font-semibold text-navy text-sm mb-2">{r.lesson_id}</div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="px-2 py-0.5 rounded bg-accent text-navy font-medium">{r.level}</span>
+                    <span className="text-teal font-semibold">+{r.xp_earned} XP</span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

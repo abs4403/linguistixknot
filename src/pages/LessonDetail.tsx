@@ -12,11 +12,14 @@ import {
   speak, stopSpeaking, listenOnce, scoreSimilarity, isSttSupported, isTtsSupported,
 } from "@/lib/speech";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { recordCompletion } from "@/lib/progress";
 
 type Mode = "flashcard" | "speak";
 
 const LessonDetail = () => {
   const { id } = useParams();
+  const { user } = useAuth();
   const found = findLessonById(id ?? "");
   const lesson = found?.lesson;
   const pack = found?.pack;
@@ -67,11 +70,30 @@ const LessonDetail = () => {
     setListening(false);
   };
 
-  const next = () => {
+  const next = async () => {
     reset();
     setFlipped(false);
-    if (idx + 1 >= lesson.cards.length) setDone(true);
-    else setIdx(idx + 1);
+    if (idx + 1 >= lesson.cards.length) {
+      setDone(true);
+      if (user) {
+        try {
+          await recordCompletion({
+            userId: user.id,
+            lessonId: lesson.id,
+            languageCode: pack.code,
+            level: lesson.level,
+            module: lesson.module,
+            xp: lesson.xp,
+            score: 100,
+          });
+          toast.success(`+${lesson.xp} XP · +5 💎`);
+        } catch (e: any) {
+          toast.error("Couldn't save progress");
+        }
+      }
+    } else {
+      setIdx(idx + 1);
+    }
   };
 
   const handleListen = async () => {
