@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Logo } from "./Logo";
 
 export const Footer = () => (
@@ -8,6 +9,9 @@ export const Footer = () => (
         <p className="text-sm text-muted-foreground max-w-xs">
           The friendly hub for learning languages with AI tutors, gamified lessons, and a global community.
         </p>
+        <Link to="/install" className="inline-block text-sm font-semibold text-teal hover:text-mint transition-smooth">
+          📲 Install the app →
+        </Link>
       </div>
       {[
         { title: "Learn", items: ["Languages", "Lessons", "AI Tutor", "Flashcards"] },
