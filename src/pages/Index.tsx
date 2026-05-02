@@ -35,7 +35,7 @@ const Index = () => (
               <Link to="/dashboard">Start learning free <ArrowRight /></Link>
             </Button>
             <Button variant="outline" size="xl" asChild className="bg-white/5 border-white/30 text-white hover:bg-white/10 hover:text-white">
-              <Link to="/lessons">Browse lessons</Link>
+              <Link to="/install">📲 Install app</Link>
             </Button>
           </div>
           <div className="flex items-center gap-6 pt-4 text-sm text-white/70">
