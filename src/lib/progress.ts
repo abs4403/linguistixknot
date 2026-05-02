@@ -49,7 +49,7 @@ export const updateDisplayName = async (userId: string, name: string) => {
   }).eq("id", userId);
 };
 
-/** Apply XP + gems + streak + weekly_xp atomically (client-side compute, then update) */
+/** Server-side atomic completion: validates and clamps XP via DB function. */
 export const recordCompletion = async (params: {
   userId: string;
   lessonId: string;
@@ -59,48 +59,16 @@ export const recordCompletion = async (params: {
   xp: number;
   score: number;
 }) => {
-  const { userId, lessonId, languageCode, level, module, xp, score } = params;
-
-  // 1. Insert completion
-  await supabase.from("lesson_completions").insert({
-    user_id: userId, lesson_id: lessonId, language_code: languageCode,
-    level, module, xp_earned: xp, score,
+  const { lessonId, languageCode, level, module, xp, score } = params;
+  const { error } = await supabase.rpc("record_completion", {
+    _lesson_id: lessonId,
+    _language_code: languageCode,
+    _level: level,
+    _module: module,
+    _xp: xp,
+    _score: score,
   });
-
-  // 2. Update progress
-  const current = await getProgress(userId);
-  if (!current) return;
-
-  const today = todayStr();
-  const monday = mondayStr();
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().slice(0, 10);
-
-  let streak = current.streak_days;
-  if (current.last_activity_date !== today) {
-    streak = current.last_activity_date === yStr ? streak + 1 : 1;
-  }
-  if (!current.last_activity_date) streak = 1;
-
-  let newXp = current.xp + xp;
-  let level_ = current.level;
-  while (newXp >= xpForLevel(level_)) {
-    newXp -= xpForLevel(level_);
-    level_++;
-  }
-
-  const sameWeek = current.week_start === monday;
-  const weekly = (sameWeek ? current.weekly_xp : 0) + xp;
-
-  await supabase.from("user_progress").update({
-    xp: current.xp + xp,
-    level: level_,
-    gems: current.gems + 5,
-    streak_days: streak,
-    last_activity_date: today,
-    weekly_xp: weekly,
-    week_start: monday,
-  }).eq("user_id", userId);
+  if (error) throw error;
 };
 
 export const getRecentCompletions = async (userId: string, limit = 10) => {
@@ -131,28 +99,16 @@ export const getWeeklyXpByDay = async (userId: string) => {
 };
 
 export const getLeaderboard = async () => {
-  const { data } = await supabase
-    .from("user_progress")
-    .select("user_id, weekly_xp, xp, level")
-    .order("weekly_xp", { ascending: false })
-    .limit(20);
-
-  if (!data?.length) return [];
-
-  const ids = data.map(r => r.user_id);
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, display_name, avatar_initials")
-    .in("id", ids);
-
-  const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? []);
-  return data.map((row, i) => ({
+  const { data, error } = await supabase.rpc("get_leaderboard");
+  if (error || !data) return [];
+  return (data as any[]).map((row, i) => ({
     rank: i + 1,
     user_id: row.user_id,
-    name: profileMap.get(row.user_id)?.display_name ?? "Learner",
-    avatar: profileMap.get(row.user_id)?.avatar_initials ?? "LL",
+    name: row.display_name ?? "Learner",
+    avatar: row.avatar_initials ?? "LL",
     xp: row.weekly_xp,
-    totalXp: row.xp,
+    totalXp: row.total_xp,
     level: row.level,
   }));
 };
+

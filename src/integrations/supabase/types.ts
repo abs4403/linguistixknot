@@ -118,10 +118,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      leaderboard: {
+        Row: {
+          avatar_initials: string | null
+          display_name: string | null
+          level: number | null
+          total_xp: number | null
+          user_id: string | null
+          week_start: string | null
+          weekly_xp: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_leaderboard: {
+        Args: never
+        Returns: {
+          avatar_initials: string
+          display_name: string
+          level: number
+          total_xp: number
+          user_id: string
+          weekly_xp: number
+        }[]
+      }
+      record_completion: {
+        Args: {
+          _language_code: string
+          _lesson_id: string
+          _level: string
+          _module: string
+          _score: number
+          _xp: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
