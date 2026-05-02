@@ -13,6 +13,7 @@ import LessonDetail from "./pages/LessonDetail.tsx";
 import Chat from "./pages/Chat.tsx";
 import Leaderboard from "./pages/Leaderboard.tsx";
 import Auth from "./pages/Auth.tsx";
+import Install from "./pages/Install.tsx";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/lesson/:id" element={<ProtectedRoute><LessonDetail /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/install" element={<Install />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

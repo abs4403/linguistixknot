@@ -25,7 +25,7 @@ export const Footer = () => (
       ))}
     </div>
     <div className="border-t border-border py-5 text-center text-xs text-muted-foreground">
-      © {new Date().getFullYear()} LLHub. Made with 💚 for language learners worldwide.
+      © {new Date().getFullYear()} Linguistix. Made with 💚 for language learners worldwide.
     </div>
   </footer>
 );

@@ -54,7 +54,7 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Welcome to LLHub! 🎉");
+        toast.success("Welcome to Linguistix! 🎉");
         navigate("/dashboard");
       } else {
         const parsed = signInSchema.safeParse({ email, password });

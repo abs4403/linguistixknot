@@ -11,7 +11,7 @@ export const Logo = ({ variant = "dark" }: { variant?: "dark" | "light" }) => {
         </div>
       </div>
       <span className={`font-display font-extrabold text-xl ${text} tracking-tight`}>
-        LL<span className="text-mint">Hub</span>
+        Linguist<span className="text-mint">ix</span>
       </span>
     </Link>
   );
