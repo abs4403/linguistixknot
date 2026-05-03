@@ -98,7 +98,7 @@ const Chat = () => {
         </Card>
 
         <p className="text-xs text-muted-foreground text-center mt-4">
-          💡 Connect Lovable AI to wire up real conversations with grammar feedback.
+          💡 Connect an AI provider to enable real conversations with grammar feedback.
         </p>
       </div>
     </Layout>
